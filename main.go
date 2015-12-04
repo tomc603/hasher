@@ -74,9 +74,11 @@ func hashFile(f *os.File) ([32]byte, error) {
 }
 
 func main() {
-	// Parse CLI arguments for files and directories to hash.
-	// Use a goroutine worker pool to calculate hashes concurrently
-	// var hm map[hash.Hash][]string
+	// TODO:
+	// Spawn goroutine to listen for items and place them in a map
+	// Spawn goroutine workers to hash items from a limited channel
+	// Place file paths into a queue for processing
+
 	hm := make(map[[32]byte][]string)
 
 	for _, p := range os.Args[1:] {
@@ -88,10 +90,14 @@ func main() {
 
 	for k, v := range hm {
 		if len(v) > 1 {
+			// Print the sha256 hash
 			fmt.Printf("%x\n", k)
 			for _, f := range v {
-				fmt.Printf(" * %s\n", f)
+				// Print each matching file path
+				fmt.Printf("%s\n", f)
 			}
+			// Extra blank line for clean formatting
+			fmt.Print("\n")
 		}
 	}
 }
