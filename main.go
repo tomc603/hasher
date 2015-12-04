@@ -21,48 +21,77 @@ package main
 import (
 	"bufio"
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 )
 
-func hashDir(p string) {
-}
-
-func hashFile(p string) string {
-	hasher := sha256.New()
-
+func hashDir(p string, hm map[[32]byte][]string) error {
 	f, err := os.Open(p)
 	if err != nil {
 		log.Fatalf("Error opening %s: %s\n", p, err)
 	}
 	defer f.Close()
 
+	s, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if s.IsDir() {
+		// The current item is a directory. Hash its files and subdirectories.
+		list, err := f.Readdir(-1)
+		if err != nil {
+			return err
+		}
+
+		for _, d := range list {
+			hashDir(filepath.Join(p, d.Name()), hm)
+		}
+	} else {
+		// Hash the current item, it is a file
+		h, err := hashFile(f)
+		if err != nil {
+			return err
+		}
+		hm[h] = append(hm[h], p)
+	}
+	return nil
+}
+
+func hashFile(f *os.File) ([32]byte, error) {
+	var v [32]byte
+	hasher := sha256.New()
+
 	r := bufio.NewReader(f)
 	if _, err := io.Copy(hasher, r); err != nil {
-		log.Fatalf("Error hashing %s: %s\n", p, err)
+		return [32]byte{}, err
 	}
+	copy(v[:], hasher.Sum(nil))
 
-	return hex.EncodeToString(hasher.Sum(nil))
+	return v, nil
 }
 
 func main() {
 	// Parse CLI arguments for files and directories to hash.
 	// Use a goroutine worker pool to calculate hashes concurrently
 	// var hm map[hash.Hash][]string
-	hm := make(map[string][]string)
+	hm := make(map[[32]byte][]string)
 
 	for _, p := range os.Args[1:] {
-		h := hashFile(p)
-		hm[h] = append(hm[h], p)
+		err := hashDir(p, hm)
+		if err != nil {
+			log.Fatalf("ERROR: %s\n", err)
+		}
 	}
 
 	for k, v := range hm {
-		fmt.Printf("%s\n", k)
-		for _, f := range v {
-			fmt.Printf(" * %s\n", f)
+		if len(v) > 1 {
+			fmt.Printf("%x\n", k)
+			for _, f := range v {
+				fmt.Printf(" * %s\n", f)
+			}
 		}
 	}
 }
