@@ -28,7 +28,10 @@ import (
 	"path/filepath"
 )
 
-func hashDir(p string, hm map[[32]byte][]string) error {
+// Create a custom type to store hashes. SSimplifies code, eases future changes.
+type hash [32]byte
+
+func hashDir(p string, hm map[hash][]string) error {
 	f, err := os.Open(p)
 	if err != nil {
 		log.Fatalf("Error opening %s: %s\n", p, err)
@@ -60,13 +63,13 @@ func hashDir(p string, hm map[[32]byte][]string) error {
 	return nil
 }
 
-func hashFile(f *os.File) ([32]byte, error) {
-	var v [32]byte
+func hashFile(f *os.File) (hash, error) {
+	var v hash
 	hasher := sha256.New()
 
 	r := bufio.NewReader(f)
 	if _, err := io.Copy(hasher, r); err != nil {
-		return [32]byte{}, err
+		return hash{}, err
 	}
 	copy(v[:], hasher.Sum(nil))
 
@@ -79,7 +82,7 @@ func main() {
 	// Spawn goroutine workers to hash items from a limited channel
 	// Place file paths into a queue for processing
 
-	hm := make(map[[32]byte][]string)
+	hm := make(map[hash][]string)
 
 	for _, p := range os.Args[1:] {
 		err := hashDir(p, hm)
